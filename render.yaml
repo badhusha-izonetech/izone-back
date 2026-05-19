@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: izone-backend
+    env: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_ORIGINS
+        value: https://izone-site.vercel.app
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 1440
+      - key: DATABASE_URL
+        sync: postgresql://izoneweb_db_q671_user:tnkgDQnyGc7AjMWDIGr6HaT18wGm8hmc@dpg-d85es30jo89c73bch180-a/izoneweb_db_q671
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USERNAME
+        sync: admin
+      - key: ADMIN_PASSWORD
+        sync: izone@2024
