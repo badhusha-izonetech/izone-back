@@ -12,22 +12,18 @@ from app.config import DATABASE_URL
 
 # Build connection kwargs from DATABASE_URL
 # Format: postgresql://user:password@host:port/dbname
-import urllib.parse as _up
-
-_parsed = _up.urlparse(DATABASE_URL)
-_DB_PARAMS = dict(
-    host=_parsed.hostname,
-    port=_parsed.port or 5432,
-    dbname=_parsed.path.lstrip("/"),
-    user=_parsed.username,
-    password=_parsed.password,
-)
-
 # Shared SQLAlchemy metadata for table creation scripts.
 Base = declarative_base()
 
-# Connection pool (min=1, max=10)
-_pool = ThreadedConnectionPool(1, 10, **_DB_PARAMS)
+_pool: ThreadedConnectionPool | None = None
+
+
+def get_pool() -> ThreadedConnectionPool:
+    """Create the connection pool only when the app actually needs the DB."""
+    global _pool
+    if _pool is None:
+        _pool = ThreadedConnectionPool(1, 10, DATABASE_URL)
+    return _pool
 
 
 def _snake_to_camel(value: str) -> str:
@@ -45,11 +41,11 @@ def _camelize(value):
 
 def get_raw_conn():
     """Get a raw psycopg2 connection from the pool."""
-    return _pool.getconn()
+    return get_pool().getconn()
 
 
 def release_conn(conn):
-    _pool.putconn(conn)
+    get_pool().putconn(conn)
 
 
 def get_db():
@@ -57,7 +53,7 @@ def get_db():
     FastAPI dependency – yields a dict-cursor connection.
     Rows are returned as dicts with column-name keys.
     """
-    conn = _pool.getconn()
+    conn = get_pool().getconn()
     conn.autocommit = False
     try:
         yield conn
@@ -66,7 +62,7 @@ def get_db():
         conn.rollback()
         raise
     finally:
-        _pool.putconn(conn)
+        get_pool().putconn(conn)
 
 
 def fetchall(conn, query, params=None):

@@ -1,12 +1,12 @@
 import sys
 from sqlalchemy import create_engine
 
-from app.config import DATABASE_URL
+from app.config import SQLALCHEMY_DATABASE_URL
 from app.database import Base
 from app import models  # noqa: F401 - registers model metadata
 from app.schema_bootstrap import ensure_database_schema
 
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=True)
 
 try:
     print("Creating tables...")

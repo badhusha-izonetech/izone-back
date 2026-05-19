@@ -1,6 +1,11 @@
-"""Runtime-safe schema alignment for existing databases."""
+"""Runtime-safe schema alignment for existing and fresh databases."""
 
+from sqlalchemy import create_engine
+
+from app.config import SQLALCHEMY_DATABASE_URL
+from app.database import Base
 from app.database import get_raw_conn, release_conn
+from app import models  # noqa: F401 - registers model metadata
 
 
 SCHEMA_UPDATES = [
@@ -18,7 +23,11 @@ SCHEMA_UPDATES = [
 
 
 def ensure_database_schema():
-    """Apply additive schema updates so the API stays compatible with the frontend."""
+    """Create missing tables, then apply additive schema updates."""
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+    Base.metadata.create_all(bind=engine)
+    engine.dispose()
+
     conn = get_raw_conn()
     conn.autocommit = True
     try:
