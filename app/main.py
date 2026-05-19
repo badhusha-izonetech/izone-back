@@ -98,7 +98,10 @@ app.include_router(dashboard.router)
 
 @app.on_event("startup")
 def startup_ensure_schema():
-    ensure_database_schema()
+    try:
+        ensure_database_schema()
+    except Exception as e:
+        logger.error("Startup schema check failed: %s", e)
 
 
 @app.get("/")

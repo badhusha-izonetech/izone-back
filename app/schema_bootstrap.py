@@ -1,11 +1,15 @@
 """Runtime-safe schema alignment for existing and fresh databases."""
 
+import logging
+import time
 from sqlalchemy import create_engine
 
 from app.config import SQLALCHEMY_DATABASE_URL
 from app.database import Base
 from app.database import get_raw_conn, release_conn
 from app import models  # noqa: F401 - registers model metadata
+
+logger = logging.getLogger(__name__)
 
 
 SCHEMA_UPDATES = [
@@ -22,11 +26,22 @@ SCHEMA_UPDATES = [
 ]
 
 
-def ensure_database_schema():
-    """Create missing tables, then apply additive schema updates."""
-    engine = create_engine(SQLALCHEMY_DATABASE_URL)
-    Base.metadata.create_all(bind=engine)
-    engine.dispose()
+def ensure_database_schema(retries: int = 5, delay: float = 3.0):
+    """Create missing tables, then apply additive schema updates.
+    Retries on connection failure to handle DB not-yet-ready on cold starts.
+    """
+    for attempt in range(1, retries + 1):
+        try:
+            engine = create_engine(SQLALCHEMY_DATABASE_URL)
+            Base.metadata.create_all(bind=engine)
+            engine.dispose()
+            break
+        except Exception as e:
+            logger.warning("DB not ready (attempt %d/%d): %s", attempt, retries, e)
+            if attempt == retries:
+                logger.error("Could not reach database after %d attempts. Startup continuing without schema sync.", retries)
+                return
+            time.sleep(delay)
 
     conn = get_raw_conn()
     conn.autocommit = True
@@ -34,5 +49,8 @@ def ensure_database_schema():
         with conn.cursor() as cur:
             for statement in SCHEMA_UPDATES:
                 cur.execute(statement)
+        logger.info("Database schema is up to date.")
+    except Exception as e:
+        logger.error("Schema update failed: %s", e)
     finally:
         release_conn(conn)
